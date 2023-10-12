@@ -9,6 +9,10 @@ import json
 
 from django.core.exceptions import ImproperlyConfigured
 
+import google.auth.transport.requests
+
+from google.oauth2 import service_account
+
 from .compat import Request, urlopen
 from .conf import get_manager
 from .exceptions import GCMError
@@ -52,17 +56,57 @@ def _gcm_send(data, content_type, application_id):
 
 
 def _fcm_send(data, content_type, application_id):
-	key = get_manager().get_fcm_api_key(application_id)
+	if "to" in data and "topics" in data["to"]:
+		new_payload = {
+			"message": {
+				"topic": data.pop("to").split("topics/")[-1],
+				**data,
+			}
+		}
+	elif "to" in data:
+		new_payload = {
+			"message": {
+				"token": data.pop("to"),  # TODO: here we might need to change time to title
+				**data,
+			}
+		}
+	else:
+		# Handle unsupported payload format
+		return {
+			"failure": "Unsupported payload format",
+			"results": [],
+		}
 
-	headers = {
-		"Content-Type": content_type,
-		"Authorization": "key=%s" % (key),
-		"Content-Length": str(len(data)),
-	}
-	request = Request(get_manager().get_post_url("FCM", application_id), data, headers)
+	new_data = json.dumps(new_payload)
+
+	headers = _get_fcm_headers(application_id, content_type, new_data)
+	request = Request(get_manager().get_post_url("FCM", application_id), new_data, headers)
+
 	return urlopen(
 		request, timeout=get_manager().get_error_timeout("FCM", application_id)
 	).read().decode("utf-8")
+
+
+
+# https://github.com/firebase/quickstart-python/blob/2c68e7c5020f4dbb072cca4da03dba389fbbe4ec/messaging/messaging.py#L26-L35
+def _generate_fcm_token(application_id) -> str:
+	service_account_path = get_manager().get_fcm_service_json(application_id)
+	credentials = service_account.Credentials.from_service_account_file(
+		service_account_path, scopes=['https://www.googleapis.com/auth/firebase.messaging'])
+	request = google.auth.transport.requests.Request()
+	credentials.refresh(request)
+	return credentials.token
+
+
+def _get_fcm_headers(application_id, content_type, data):
+	token = _generate_fcm_token(application_id)
+	# key = get_manager().get_fcm_api_key(application_id)
+	headers = {
+		"Content-Type": content_type,
+		"Authorization": "Bearer %s" % token,
+		"Content-Length": str(len(data)),
+	}
+	return headers
 
 
 def _cm_handle_response(registration_ids, response_data, cloud_type, application_id=None):

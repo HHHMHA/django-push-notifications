@@ -311,6 +311,9 @@ class AppConfig(BaseConfig):
 	def get_fcm_api_key(self, application_id=None):
 		return self._get_application_settings(application_id, "FCM", "API_KEY")
 
+	def get_fcm_service_json(self, application_id=None):
+		return self._get_application_settings(application_id, "FCM", "SERVICE_JSON")
+
 	def get_post_url(self, cloud_type, application_id=None):
 		return self._get_application_settings(application_id, cloud_type, "POST_URL")
 

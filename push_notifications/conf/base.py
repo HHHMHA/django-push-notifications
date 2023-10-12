@@ -20,6 +20,9 @@ class BaseConfig:
 	def get_fcm_api_key(self, application_id=None):
 		raise NotImplementedError
 
+	def get_fcm_service_json(self, application_id=None):
+		raise NotImplementedError
+
 	def get_gcm_api_key(self, application_id=None):
 		raise NotImplementedError
 
