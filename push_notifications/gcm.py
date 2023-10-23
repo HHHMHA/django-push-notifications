@@ -56,35 +56,38 @@ def _gcm_send(data, content_type, application_id):
 
 
 def _fcm_send(data, content_type, application_id):
-	if "to" in data and "topics" in data["to"]:
+	old_payload = json.loads(data)
+	if "to" in old_payload and "topics" in old_payload["to"]:
 		new_payload = {
 			"message": {
-				"topic": data.pop("to").split("topics/")[-1],
-				**data,
+				"topic": old_payload.pop("to").split("topics/")[-1],
+				**old_payload,
 			}
 		}
-	elif "to" in data:
+	elif "to" in old_payload or "registration_ids" in old_payload:
+		token = old_payload.pop("to", old_payload.pop("registration_ids")[0])
 		new_payload = {
 			"message": {
-				"token": data.pop("to"),  # TODO: here we might need to change time to title
-				**data,
+				"token": token,  # TODO: here we might need to change time to title
+				**old_payload,
 			}
 		}
 	else:
 		# Handle unsupported payload format
-		return {
+		return json.dumps({
 			"failure": "Unsupported payload format",
 			"results": [],
-		}
+		})
 
-	new_data = json.dumps(new_payload)
+	new_data = json.dumps(new_payload).encode("utf-8")
 
 	headers = _get_fcm_headers(application_id, content_type, new_data)
 	request = Request(get_manager().get_post_url("FCM", application_id), new_data, headers)
 
-	return urlopen(
+	response = urlopen(
 		request, timeout=get_manager().get_error_timeout("FCM", application_id)
 	).read().decode("utf-8")
+	return response
 
 
 

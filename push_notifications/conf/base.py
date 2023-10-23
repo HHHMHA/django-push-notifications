@@ -21,7 +21,7 @@ class BaseConfig:
 		raise NotImplementedError
 
 	def get_fcm_service_json(self, application_id=None):
-		raise NotImplementedError
+		return self._get_application_settings(application_id, "SERVICE_JSON", "SERVICE_JSON")
 
 	def get_gcm_api_key(self, application_id=None):
 		raise NotImplementedError
